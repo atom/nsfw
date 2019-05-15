@@ -26,13 +26,15 @@ NSFW::NSFW(uint32_t debounceMS, std::string path, Callback *eventCallback, Callb
   }
 
 NSFW::~NSFW() {
-  if (mInterface != NULL) {
-    delete mInterface;
-  }
   delete mEventCallback;
   delete mErrorCallback;
 
   if (mInterfaceLockValid) {
+    uv_mutex_lock(&mInterfaceLock);
+    if (mInterface != NULL) {
+      delete mInterface;
+    }
+    uv_mutex_unlock(&mInterfaceLock);
     uv_mutex_destroy(&mInterfaceLock);
   }
 }
