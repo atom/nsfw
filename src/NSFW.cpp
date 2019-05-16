@@ -1,4 +1,5 @@
 #include "../includes/NSFW.h"
+#include <iostream>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -26,7 +27,9 @@ NSFW::NSFW(uint32_t debounceMS, std::string path, Callback *eventCallback, Callb
   }
 
 NSFW::~NSFW() {
+  std::cout << "Destroying NSFW\n";
   if (mInterface != NULL) {
+    std::cout << "Deleting mInterface\n";
     delete mInterface;
   }
   delete mEventCallback;
@@ -210,6 +213,7 @@ NAN_METHOD(NSFW::Start) {
     return;
   }
 
+  std::cout << "Resetting persistent handle to info.This() in NSFW::Start...\n";
   New(nsfw->mPersistentHandle)->Set(New("nsfw").ToLocalChecked(), info.This());
 
   AsyncQueueWorker(new StartWorker(nsfw, callback));
@@ -217,6 +221,7 @@ NAN_METHOD(NSFW::Start) {
 
 NSFW::StartWorker::StartWorker(NSFW *nsfw, Callback *callback):
   AsyncWorker(callback), mNSFW(nsfw) {
+    std::cout << "Reinitting async callbacks in NSFW::StartWorker::Start...\n";
     uv_async_init(uv_default_loop(), &nsfw->mErrorCallbackAsync, &NSFW::fireErrorCallback);
     uv_async_init(uv_default_loop(), &nsfw->mEventCallbackAsync, &NSFW::fireEventCallback);
   }
@@ -230,10 +235,15 @@ void NSFW::StartWorker::Execute() {
   }
 
   mNSFW->mInterface = new NativeInterface(mNSFW->mPath);
+  std::cout << "Sleeping before using mInterface within StartWorker::Execute...\n";
+  sleep_for_ms(2000);
+  std::cout << "Will use mInterface...\n";
   if (mNSFW->mInterface->isWatching()) {
+    std::cout << "Spawning thread within StartWorker::Execute...\n";
     mNSFW->mRunning = true;
     uv_thread_create(&mNSFW->mPollThread, NSFW::pollForEvents, mNSFW);
   } else {
+    std::cout << "Deleting mInterface within StartWorker::Execute...\n";
     delete mNSFW->mInterface;
     mNSFW->mInterface = NULL;
   }
@@ -245,6 +255,7 @@ void NSFW::StartWorker::HandleOKCallback() {
   HandleScope();
   if (mNSFW->mInterface == NULL) {
     if (!mNSFW->mPersistentHandle.IsEmpty()) {
+      std::cout << "Resetting persistent handle in StartWorker::HandleOKCallback...\n";
       v8::Local<v8::Object> obj = New<v8::Object>();
       mNSFW->mPersistentHandle.Reset(obj);
     }
@@ -253,6 +264,7 @@ void NSFW::StartWorker::HandleOKCallback() {
     };
     callback->Call(1, argv);
   } else {
+    std::cout << "Invoking StartWorker::HandleOKCallback...\n";
     callback->Call(0, NULL);
   }
 }
@@ -307,6 +319,9 @@ void NSFW::StopWorker::Execute() {
   mNSFW->mInterface = NULL;
 
   uv_mutex_unlock(&mNSFW->mInterfaceLock);
+  std::cout << "Sleeping in Stop::Execute...\n";
+  sleep_for_ms(1000);
+  std::cout << "Resuming from sleep in Stop::Execute...\n";
 }
 
 void NSFW::StopWorker::HandleOKCallback() {
@@ -314,6 +329,7 @@ void NSFW::StopWorker::HandleOKCallback() {
 
   if (!mNSFW->mPersistentHandle.IsEmpty()) {
     v8::Local<v8::Object> obj = New<v8::Object>();
+    std::cout << "Resetting persistent handle in StopWorker::HandleOKCallback...\n";
     mNSFW->mPersistentHandle.Reset(obj);
   }
 
