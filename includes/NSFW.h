@@ -22,6 +22,7 @@ public:
   uint32_t mDebounceMS;
   uv_async_t mErrorCallbackAsync;
   uv_async_t mEventCallbackAsync;
+  AsyncResource *mResource;
   Callback *mErrorCallback;
   Callback *mEventCallback;
   NativeInterface *mInterface;
@@ -31,7 +32,7 @@ public:
   uv_thread_t mPollThread;
   std::atomic<bool> mRunning;
 private:
-  NSFW(uint32_t debounceMS, std::string path, Callback *eventCallback, Callback *errorCallback);
+  NSFW(uint32_t debounceMS, std::string path, AsyncResource *resource, Callback *eventCallback, Callback *errorCallback);
   ~NSFW();
 
   struct ErrorBaton {
@@ -49,21 +50,23 @@ private:
   static NAN_METHOD(Start);
   class StartWorker : public AsyncWorker {
   public:
-    StartWorker(NSFW *nsfw, Callback *callback);
+    StartWorker(NSFW *nsfw, AsyncResource *resource, Callback *callback);
     void Execute();
     void HandleOKCallback();
   private:
     NSFW *mNSFW;
+    AsyncResource *mResource;
   };
 
   static NAN_METHOD(Stop);
   class StopWorker : public AsyncWorker {
   public:
-    StopWorker(NSFW *nsfw, Callback *callback);
+    StopWorker(NSFW *nsfw, AsyncResource *resource, Callback *callback);
     void Execute();
     void HandleOKCallback();
   private:
     NSFW *mNSFW;
+    AsyncResource *mResource;
   };
 
   static Persistent<v8::Function> constructor;

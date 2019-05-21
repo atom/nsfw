@@ -11,8 +11,9 @@
 #pragma unmanaged
 Persistent<v8::Function> NSFW::constructor;
 
-NSFW::NSFW(uint32_t debounceMS, std::string path, Callback *eventCallback, Callback *errorCallback):
+NSFW::NSFW(uint32_t debounceMS, std::string path, AsyncResource *resource, Callback *eventCallback, Callback *errorCallback):
   mDebounceMS(debounceMS),
+  mResource(resource),
   mErrorCallback(errorCallback),
   mEventCallback(eventCallback),
   mInterface(NULL),
@@ -29,6 +30,7 @@ NSFW::~NSFW() {
   if (mInterface != NULL) {
     delete mInterface;
   }
+  delete mResource;
   delete mEventCallback;
   delete mErrorCallback;
 
@@ -48,7 +50,7 @@ void NSFW::fireErrorCallback(uv_async_t *handle) {
   v8::Local<v8::Value> argv[] = {
     New<v8::String>(baton->error).ToLocalChecked()
   };
-  baton->nsfw->mErrorCallback->Call(1, argv);
+  baton->nsfw->mErrorCallback->Call(1, argv, baton->nsfw->mResource);
   delete baton;
 }
 
@@ -90,7 +92,7 @@ void NSFW::fireEventCallback(uv_async_t *handle) {
     eventArray
   };
 
-  baton->nsfw->mEventCallback->Call(1, argv);
+  baton->nsfw->mEventCallback->Call(1, argv, baton->nsfw->mResource);
 
   uv_thread_t cleanup;
   uv_thread_create(&cleanup, NSFW::cleanupEventCallback, baton);
@@ -177,10 +179,11 @@ NAN_METHOD(NSFW::JSNew) {
   uint32_t debounceMS = info[0]->Uint32Value();
   v8::String::Utf8Value utf8Value(info[1]->ToString());
   std::string path = std::string(*utf8Value);
+  AsyncResource *resource = new AsyncResource("NSFW:Events");
   Callback *eventCallback = new Callback(info[2].As<v8::Function>());
   Callback *errorCallback = new Callback(info[3].As<v8::Function>());
 
-  NSFW *nsfw = new NSFW(debounceMS, path, eventCallback, errorCallback);
+  NSFW *nsfw = new NSFW(debounceMS, path, resource, eventCallback, errorCallback);
   nsfw->Wrap(info.This());
   info.GetReturnValue().Set(info.This());
 }
@@ -200,24 +203,26 @@ NAN_METHOD(NSFW::Start) {
     return ThrowError("Must provide callback to start.");
   }
 
+  AsyncResource *resource = new AsyncResource("NSFW:Start");
   Callback *callback = new Callback(info[0].As<v8::Function>());
 
   if (nsfw->mInterface != NULL) {
     v8::Local<v8::Value> argv[1] = {
       Nan::Error("This NSFW cannot be started, because it is already running.")
     };
-    callback->Call(1, argv);
+    Call(*callback, 1, argv);
     delete callback;
+    delete resource;
     return;
   }
 
   New(nsfw->mPersistentHandle)->Set(New("nsfw").ToLocalChecked(), info.This());
 
-  AsyncQueueWorker(new StartWorker(nsfw, callback));
+  AsyncQueueWorker(new StartWorker(nsfw, resource, callback));
 }
 
-NSFW::StartWorker::StartWorker(NSFW *nsfw, Callback *callback):
-  AsyncWorker(callback), mNSFW(nsfw) {
+NSFW::StartWorker::StartWorker(NSFW *nsfw, AsyncResource *resource, Callback *callback):
+  AsyncWorker(callback), mNSFW(nsfw), mResource(resource) {
     uv_async_init(uv_default_loop(), &nsfw->mErrorCallbackAsync, &NSFW::fireErrorCallback);
     uv_async_init(uv_default_loop(), &nsfw->mEventCallbackAsync, &NSFW::fireEventCallback);
   }
@@ -252,10 +257,11 @@ void NSFW::StartWorker::HandleOKCallback() {
     v8::Local<v8::Value> argv[1] = {
       Nan::Error("NSFW was unable to start watching that directory.")
     };
-    callback->Call(1, argv);
+    callback->Call(1, argv, mResource);
   } else {
-    callback->Call(0, NULL);
+    callback->Call(0, NULL, mResource);
   }
+  delete mResource;
 }
 
 NAN_METHOD(NSFW::Stop) {
@@ -273,22 +279,24 @@ NAN_METHOD(NSFW::Stop) {
     return ThrowError("Must provide callback to stop.");
   }
 
+  AsyncResource *resource = new AsyncResource("NSFW:Stop");
   Callback *callback = new Callback(info[0].As<v8::Function>());
 
   if (nsfw->mInterface == NULL) {
     v8::Local<v8::Value> argv[1] = {
       Nan::Error("This NSFW cannot be stopped, because it is not running.")
     };
-    callback->Call(1, argv);
+    Call(*callback, 1, argv);
     delete callback;
+    delete resource;
     return;
   }
 
-  AsyncQueueWorker(new StopWorker(nsfw, callback));
+  AsyncQueueWorker(new StopWorker(nsfw, resource, callback));
 }
 
-NSFW::StopWorker::StopWorker(NSFW *nsfw, Callback *callback):
-  AsyncWorker(callback), mNSFW(nsfw) {}
+NSFW::StopWorker::StopWorker(NSFW *nsfw, AsyncResource *resource, Callback *callback):
+  AsyncWorker(callback), mNSFW(nsfw), mResource(resource) {}
 
 void NSFW::StopWorker::Execute() {
   uv_mutex_lock(&mNSFW->mInterfaceLock);
@@ -321,7 +329,8 @@ void NSFW::StopWorker::HandleOKCallback() {
   uv_close(reinterpret_cast<uv_handle_t*>(&mNSFW->mErrorCallbackAsync), nullptr);
   uv_close(reinterpret_cast<uv_handle_t*>(&mNSFW->mEventCallbackAsync), nullptr);
 
-  callback->Call(0, NULL);
+  callback->Call(0, NULL, mResource);
+  delete mResource;
 }
 
 NODE_MODULE(nsfw, NSFW::Init)
