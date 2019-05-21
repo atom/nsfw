@@ -176,8 +176,8 @@ NAN_METHOD(NSFW::JSNew) {
     return ThrowError("Fourth argument of constructor must be a callback.");
   }
 
-  uint32_t debounceMS = info[0]->Uint32Value();
-  v8::String::Utf8Value utf8Value(info[1]->ToString());
+  uint32_t debounceMS = info[0]->ToUint32(GetCurrentContext()).ToLocalChecked()->Value();
+  Utf8String utf8Value(info[1]->ToString());
   std::string path = std::string(*utf8Value);
   AsyncResource *resource = new AsyncResource("NSFW:Events");
   Callback *eventCallback = new Callback(info[2].As<v8::Function>());
