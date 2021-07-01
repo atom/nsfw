@@ -1,23 +1,4 @@
-# node-sentinel-file-watcher
-<table>
-  <thead>
-    <tr>
-      <th>Linux</th>
-      <th>OS X</th>
-      <th>Windows</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td colspan="2" align="center">
-      <a href="https://travis-ci.org/Axosoft/nsfw"><img src="https://travis-ci.org/Axosoft/nsfw.svg?branch=master"></a>
-      </td>
-      <td align="center">
-        <a href="https://ci.appveyor.com/project/implausible/node-simple-file-watcher"><img src="https://ci.appveyor.com/api/projects/status/79ejlq7e60kjmbl6?svg=true"></a>
-      </td>
-    </tr>
-  </tbody>
-</table>
+[![CI](https://github.com/atom/nsfw/actions/workflows/ci.yml/badge.svg)](https://github.com/atom/nsfw/actions/workflows/ci.yml)
 A simple file watcher library for node.
 
 ## Why NSFW?
