@@ -41,7 +41,7 @@
                 "xcode_settings": {
                     'MACOSX_DEPLOYMENT_TARGET': '10.7',
                     "OTHER_CFLAGS": [
-                        "-std=c++11",
+                        "-std=c++14",
                         "-stdlib=libc++"
                     ],
                 },
@@ -67,7 +67,7 @@
                 ],
                 "cflags": [
                     "-Wno-unknown-pragmas",
-                    "-std=c++11"
+                    "-std=c++14"
                 ]
             }],
             ["OS=='win'", {
